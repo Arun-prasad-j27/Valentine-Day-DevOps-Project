@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+    environment{
+        SCANNER_HOME=tool 'sonar-scanner'
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Arun-prasad-j27/Valentine-Day-DevOps-Project.git'
+            }
+        }
+        
+        stage('Trivy File System Scan ') {
+            steps {
+                sh "trivy fs ."
+            }
+        }
+        
+        stage('Sonarqube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=valentine \
+                    -Dsonar.projectKey=valentine '''
+                }
+            }
+        }
+        
+        stage('Docker Image build') {
+            steps {
+                script{
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                        sh "docker build -t arunprasadj/valentine:latest ."
+                    }
+                }
+            }
+        }
+        
+        stage('Trivy image scan ') {
+            steps {
+                sh "trivy image arunprasadj/valentine:latest"
+            }
+        }
+        
+        stage('Docker push') {
+            steps {
+                script{
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                        sh "docker push arunprasadj/valentine:latest"
+                    }
+                }
+            }
+        }
+        
+        stage('docker deploy to container ') {
+            steps {
+                sh "docker run -d -p 8081:80 arunprasadj/valentine:latest"
+            }
+        }
+    }
+}
